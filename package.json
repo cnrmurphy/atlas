@@ -1,0 +1,25 @@
+{
+  "name": "atlas",
+  "version": "1.0.0",
+  "description": "trading system",
+  "main": "index.js",
+  "dependencies": {
+    "coinbase": "^2.0.8",
+    "coinbase-pro": "^0.9.0",
+    "ftx-us": "^1.0.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/8bitstout/atlas.git"
+  },
+  "author": "Conor Murphy",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/8bitstout/atlas/issues"
+  },
+  "homepage": "https://github.com/8bitstout/atlas#readme"
+}
