@@ -37,13 +37,22 @@ const Ask = (price, size) => ({ price, size });
         const cbpPrice = (cbpAsk.price * tradeSize) - ((cbpAsk.price * tradeSize) * .005);
         console.log(`Bid: ${ftxBid.price} | Ask: ${cbpAsk.price} | spread: ${Math.abs(cbpAsk.price - ftxBid.price)} | ftxPrice: ${ftxPrice} | cbpPrice: ${cbpPrice} | profit: ${ftxPrice - cbpPrice} | profit before fees: ${(ftxBid.price * tradeSize) - (cbpAsk.price * tradeSize)}`);
         if (Number(cbpUsdWallet.balance) >= cbpAsk.price && ftxEthWallet.total > 0) {
-          //calculateTrade(cbpAsk, .005, ftxBid, .003);
+          if (ftxEthWallet.total <= tradeSize) {
+            console.log(tradeSize);
+            console.log(`Selling ${ftxEthWallet.total} ETH for ${ftxBid.price}`);
+            //const cbpResponse = await placeCoinbaseOrder(cbpAsk.price, tradeSize, cbpClient);
+            const ftxResponse = await placeFtxOrder(ftxBid.price, ftxEthWallet.total, ftxUs);
+            console.log(ftxResponse);
+          } else {
+            console.log(tradeSize)
+          }
         } else {
           console.log(cbpUsdWallet.balance >= cbpAsk.price);
-          //console.log('Can\'t make trade, incorrect balance', { cpbWallet: cbpUsdWallet, ftxWallet: ftxEthWallet });
+          console.log('Can\'t make trade, incorrect balance', { cpbWallet: cbpUsdWallet, ftxWallet: ftxEthWallet });
         }
       }
-      await sleep(5000);
+      break;
+      //await sleep(5000);
     }
   } catch(e) {
     console.log(e);
@@ -60,4 +69,12 @@ function makeDeltaNeutral() {
 
 function trade() {
 
+}
+
+function placeCoinbaseOrder(price, size, cli) {
+  return cli.placeOder({ side: 'buy', price, size, product_id: 'ETH-USD' });
+}
+
+function placeFtxOrder(price, size, ftx) {
+  return ftx.Orders.placeOrder(currencyPairs.ETH.USD, 'sell', price, 'market', size);
 }
