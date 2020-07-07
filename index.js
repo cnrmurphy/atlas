@@ -26,19 +26,18 @@ const Bid = (price, size) => ({ price, size });
       const cbpBid = Bid(bestCbpBid[0], bestCbpBid[1]);
   
       if (ftxBid.price > cbpBid.price) {
-        const profit = (ftxBid.price - getCbpTradeCost(cbpBid.price)) * Math.min(ftxBid.size, cbpBid.size);
-        console.log('Trade found: ' + profit);
+        const tradeSize = Math.min(ftxBid.size, cbpBid.size);
+        const cbpPrice = (cbpBid.price * tradeSize) - ((cbpBid.price * tradeSize) * .005);
+        const ftxPrice = (ftxBid.price * tradeSize) - ((ftxBid.price * tradeSize) * .003);
+        const profit = (ftxPrice - cbpPrice);
+        console.log('Trade found: ' + profit + ` | CoinbasePro: $${cbpPrice} | FTX: $${ftxPrice} | Size: ${tradeSize}`);
       }
-      await sleep(2000);
+      await sleep(5000);
     }
   } catch(e) {
     console.log(e);
   }
 })();
-
-function getCbpTradeCost(price) {
-  return price - (price * .005);
-}
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
