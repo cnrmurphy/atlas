@@ -1,5 +1,6 @@
 const { FTXUS } = require('ftx-us');
-const Client = require('coinbase').Client;
+const CoinbasePro = require('coinbase-pro');
+const publicClient = new CoinbasePro.PublicClient();
 
 const apiKey = process.env.FTX_API_KEY;
 const apiSecret = process.env.FTX_API_SECRET;
