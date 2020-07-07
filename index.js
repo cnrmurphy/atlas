@@ -16,18 +16,20 @@ const Bid = (price, size) => ({ price, size });
 
 (async () => {
   try { 
-    const ftxWallet = ftxUs.Wallet;
-    const balances = await ftxWallet.getBalances();
-    const [ftxOrderBook, cbpOrderBook] = await Promise.all([ftxUs.Markets.getOrderBook(currencyPairs.ETH.USD), cbpClient.getProductOrderBook('ETH-USD')]);
-    const bestFtxBid = ftxOrderBook.asks[0];
-    const bestCbpBid = cbpOrderBook.bids[0];
-    const ftxBid = Bid(bestFtxBid[0], bestFtxBid[1]);
-    const cbpBid = Bid(bestCbpBid[0], bestCbpBid[1]);
-    console.log(ftxBid, cbpBid);
-
-    if (ftxBid.price > cbpBid.price) {
-      const profit = (ftxBid.price - getCbpTradeCost(cbpBid.price)) * Math.min(ftxBid.size, cbpBid.size);
-      console.log(profit);
+    //const ftxWallet = ftxUs.Wallet;
+    //const balances = await ftxWallet.getBalances();
+    while(true) {
+      const [ftxOrderBook, cbpOrderBook] = await Promise.all([ftxUs.Markets.getOrderBook(currencyPairs.ETH.USD), cbpClient.getProductOrderBook('ETH-USD')]);
+      const bestFtxBid = ftxOrderBook.asks[0];
+      const bestCbpBid = cbpOrderBook.bids[0];
+      const ftxBid = Bid(bestFtxBid[0], bestFtxBid[1]);
+      const cbpBid = Bid(bestCbpBid[0], bestCbpBid[1]);
+  
+      if (ftxBid.price > cbpBid.price) {
+        const profit = (ftxBid.price - getCbpTradeCost(cbpBid.price)) * Math.min(ftxBid.size, cbpBid.size);
+        console.log('Trade found: ' + profit);
+      }
+      await sleep(2000);
     }
   } catch(e) {
     console.log(e);
@@ -36,4 +38,8 @@ const Bid = (price, size) => ({ price, size });
 
 function getCbpTradeCost(price) {
   return price - (price * .005);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
