@@ -7,17 +7,18 @@ const cbpClient = new CoinbasePro.AuthenticatedClient(
   'https://api.pro.coinbase.com'
 );
 
-const apiKey = process.env.FTX_API_KEY;
-const apiSecret = process.env.FTX_API_SECRET;
+const ftxApiKey = process.env.FTX_API_KEY;
+const ftxApiSecret = process.env.FTX_API_SECRET;
 
-const ftxUs = new FTXUS({ key: apiKey, secret: apiSecret });
+const ftxUs = new FTXUS({ key: ftxApiKey, secret: ftxApiSecret });
 
 const Bid = (price, size) => ({ price, size });
 
 (async () => {
   try { 
-    //const ftxWallet = ftxUs.Wallet;
-    //const balances = await ftxWallet.getBalances();
+    const ftxWallet = ftxUs.Wallet;
+    const balances = await ftxWallet.getBalances();
+    console.log(balances);
     while(true) {
       const [ftxOrderBook, cbpOrderBook] = await Promise.all([ftxUs.Markets.getOrderBook(currencyPairs.ETH.USD), cbpClient.getProductOrderBook('ETH-USD')]);
       const bestFtxBid = ftxOrderBook.asks[0];
