@@ -13,21 +13,35 @@ const ftxApiSecret = process.env.FTX_API_SECRET;
 const ftxUs = new FTXUS({ key: ftxApiKey, secret: ftxApiSecret });
 
 const Bid = (price, size) => ({ price, size });
+const Ask = (price, size) => ({ price, size });
 
 (async () => {
   try { 
     const ftxWallet = ftxUs.Wallet;
-    const balances = await ftxWallet.getBalances();
-    console.log(balances);
+    const [ftxBalances, cbpBalances] = await Promise.all([await ftxWallet.getBalances(), await cbpClient.getAccounts()]);
+    const ftxEthWallet = ftxBalances.find(({ coin }) => coin === 'ETH');
+    const ftxUsdWallet = ftxBalances.find(({ coin }) => coin === 'USD');
+    const cbpEthWallet = cbpBalances.find(({ currency }) => currency === 'ETH');
+    const cbpUsdWallet = cbpBalances.find(({ currency }) => currency === 'USD');
+    console.log('FTX Balance', { usd: ftxUsdWallet, eth: ftxEthWallet }, '\n', 'CBP Balance', { usd: cbpUsdWallet, eth: cbpEthWallet }); 
     while(true) {
       const [ftxOrderBook, cbpOrderBook] = await Promise.all([ftxUs.Markets.getOrderBook(currencyPairs.ETH.USD), cbpClient.getProductOrderBook('ETH-USD')]);
-      const bestFtxBid = ftxOrderBook.asks[0];
-      const bestCbpBid = cbpOrderBook.bids[0];
+      const bestFtxBid = ftxOrderBook.bids[0];
+      const bestCbpAsk = cbpOrderBook.asks[0];
       const ftxBid = Bid(bestFtxBid[0], bestFtxBid[1]);
-      const cbpBid = Bid(bestCbpBid[0], bestCbpBid[1]);
+      const cbpAsk = Ask(bestCbpAsk[0], bestCbpAsk[1]);
   
-      if (ftxBid.price > cbpBid.price) {
-        calculateTrade(cbpBid, .005, ftxBid, .003)
+      if (ftxBid.price > cbpAsk.price) {
+        const tradeSize = Math.min(ftxBid.size, cbpAsk.size);
+        const ftxPrice = (ftxBid.price * tradeSize) - ((ftxBid.price * tradeSize) * .003);
+        const cbpPrice = (cbpAsk.price * tradeSize) - ((cbpAsk.price * tradeSize) * .005);
+        console.log(`Bid: ${ftxBid.price} | Ask: ${cbpAsk.price} | spread: ${Math.abs(cbpAsk.price - ftxBid.price)} | ftxPrice: ${ftxPrice} | cbpPrice: ${cbpPrice} | profit: ${ftxPrice - cbpPrice} | profit before fees: ${(ftxBid.price * tradeSize) - (cbpAsk.price * tradeSize)}`);
+        if (Number(cbpUsdWallet.balance) >= cbpAsk.price && ftxEthWallet.total > 0) {
+          //calculateTrade(cbpAsk, .005, ftxBid, .003);
+        } else {
+          console.log(cbpUsdWallet.balance >= cbpAsk.price);
+          //console.log('Can\'t make trade, incorrect balance', { cpbWallet: cbpUsdWallet, ftxWallet: ftxEthWallet });
+        }
       }
       await sleep(5000);
     }
@@ -46,12 +60,4 @@ function makeDeltaNeutral() {
 
 function trade() {
 
-}
-
-function calculateTrade(bidA, bidAFee, bidB, bidBFee) {
-  const tradeSize = Math.min(bidA.size, bidB.size);
-  const bidAPrice = (bidA.price * tradeSize) - ((bidA.price * tradeSize) * bidAFee);
-  const bidBPrice = (bidB.price * tradeSize) - ((bidB.price * tradeSize) * bidBFee);
-  const profit = (bidBPrice - bidAPrice);
-  console.log('Trade found: ' + profit + ` | BidA: $${bidAPrice} | BidB: $${bidBPrice} | Size: ${tradeSize}`);
 }
