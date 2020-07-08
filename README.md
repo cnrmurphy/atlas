@@ -32,4 +32,12 @@ this pricing inefficiency exists. If larger market makers were to offer liquidit
 then it would likely disappear as prices across exchanges converge (it may always be there to some extend given some of
 the aforementioned factors). The reason for the lack of these larger market makers (such as institutions) is most likely
 due to the risk of keeping large amounts of capital on a crypto exchange (hacks run rampant and owners sometimes go rouge)
-and the difficulty of getting large amounts of capital on  crypto exchanges in the first place.
+and the difficulty of getting large amounts of capital on crypto exchanges in the first place. There is a bit of a chicken
+and egg problem when it comes to liquidity: without liquidity, markets are subject to state of high volatility more often.
+Market makers help solve this problem by risking their capital and earning the spread on every transaction - this helps
+prevent prices from gapping and thus resulting in a more liquid and less volatile market. But at the same time, market makers
+will be hesitant to provide liquidity in volatile markets (less liquid). Traditional markets do not have this issue because
+there is more data available making it easier for market makers to make decisions, there are less exchanges resulting in more
+concentrated liquidty, there are cheaper fees (market makers such as high frequency trading firms actually help make this happen),
+the exchanges that do exist are trusted and insured, and there are more financial products (derivatives such as futures and options)
+available to construct an efficient portfolio of securities.
