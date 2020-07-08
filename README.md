@@ -40,4 +40,5 @@ will be hesitant to provide liquidity in volatile markets (less liquid). Traditi
 there is more data available making it easier for market makers to make decisions, there are less exchanges resulting in more
 concentrated liquidty, there are cheaper fees (market makers such as high frequency trading firms actually help make this happen),
 the exchanges that do exist are trusted and insured, and there are more financial products (derivatives such as futures and options)
-available to construct an efficient portfolio of securities.
+available to construct an efficient portfolio of securities. Crypto is starting to achieve some of these things by providing crypto derivatives,
+but the issues of liquidity will most likely not be solved until the greater financial system is willing to adopt crypto assets.
