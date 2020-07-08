@@ -24,37 +24,44 @@ const Ask = (price, size) => ({ price, size });
     const cbpEthWallet = cbpBalances.find(({ currency }) => currency === 'ETH');
     const cbpUsdWallet = cbpBalances.find(({ currency }) => currency === 'USD');
     console.log('FTX Balance', { usd: ftxUsdWallet, eth: ftxEthWallet }, '\n', 'CBP Balance', { usd: cbpUsdWallet, eth: cbpEthWallet }); 
+
     while(true) {
       const [ftxOrderBook, cbpOrderBook] = await Promise.all([ftxUs.Markets.getOrderBook(currencyPairs.ETH.USD), cbpClient.getProductOrderBook('ETH-USD')]);
       const bestFtxBid = ftxOrderBook.bids[0];
       const bestCbpAsk = cbpOrderBook.asks[0];
       const ftxBid = Bid(bestFtxBid[0], bestFtxBid[1]);
       const cbpAsk = Ask(bestCbpAsk[0], bestCbpAsk[1]);
-  
+
+      if (Number(cbpUsdWallet.balance) <= 50) {
+        console.log('You need to rebalance');
+        break;
+      }
+      
+      // The spread must favor our trade to continue
       if (ftxBid.price > cbpAsk.price) {
         const tradeSize = Math.min(ftxBid.size, cbpAsk.size);
         const ftxPrice = (ftxBid.price * tradeSize) - ((ftxBid.price * tradeSize) * .003);
         const cbpPrice = (cbpAsk.price * tradeSize) - ((cbpAsk.price * tradeSize) * .005);
         console.log(`Bid: ${ftxBid.price} | Ask: ${cbpAsk.price} | spread: ${Math.abs(cbpAsk.price - ftxBid.price)} | ftxPrice: ${ftxPrice} | cbpPrice: ${cbpPrice} | profit: ${ftxPrice - cbpPrice} | profit before fees: ${(ftxBid.price * tradeSize) - (cbpAsk.price * tradeSize)}`);
-        if (Number(cbpUsdWallet.balance) >= cbpAsk.price && ftxEthWallet.total > 0) {
-          if (ftxEthWallet.total <= tradeSize) {
-            console.log(tradeSize);
-            //console.log(`Selling ${ftxEthWallet.total} ETH for ${ftxBid.price}`);
-            const ethSize = getEthSizeToBuy(tradeSize, cbpAsk.price, cbpUsdWallet.total);
-            console.log(`Buying ${ethSize} ETH for ${cbpAsk.price}`);
-            const cbpResponse = await placeCoinbaseOrder(cbpAsk.price, ethSize, cbpClient);
-            //const ftxResponse = await placeFtxOrder(ftxBid.price, ftxEthWallet.total, ftxUs);
-            console.log(cbpResponse);
-          } else {
-            console.log(tradeSize)
+
+        // We can only trade if we have enough USD to buy ETH at the given order book level and we have ETH on the opposing exchange
+        if (Number(cbpUsdWallet.balance) >= (cbpAsk.price * tradeSize) && ftxEthWallet.total > 0) {
+          const ethSize = getEthSizeToBuy(tradeSize, cbpAsk.price, cbpUsdWallet.total);
+          console.log(`Buying ${ethSize} ETH for ${cbpAsk.price} on Coinbase Pro`);
+          const cbpResponse = await placeCoinbaseOrder(cbpAsk.price, ethSize, cbpClient);
+          console.log(cbpResponse);
+          console.log(`Selling ${ethSize} ETH for ${ftxBid.price} on FTX`);
+          const ftxResponse = await placeFtxOrder(ftxBid.price, ethSize, ftxUs);
+          if (!ftxResponse.success) {
+            console.log(ftxResponse);
+            break;
           }
         } else {
-          console.log(cbpUsdWallet.balance >= cbpAsk.price);
           console.log('Can\'t make trade, incorrect balance', { cpbWallet: cbpUsdWallet, ftxWallet: ftxEthWallet });
         }
       }
-      break;
-      //await sleep(5000);
+
+      await sleep(3000);
     }
   } catch(e) {
     console.log(e);
