@@ -39,10 +39,12 @@ const Ask = (price, size) => ({ price, size });
         if (Number(cbpUsdWallet.balance) >= cbpAsk.price && ftxEthWallet.total > 0) {
           if (ftxEthWallet.total <= tradeSize) {
             console.log(tradeSize);
-            console.log(`Selling ${ftxEthWallet.total} ETH for ${ftxBid.price}`);
-            //const cbpResponse = await placeCoinbaseOrder(cbpAsk.price, tradeSize, cbpClient);
-            const ftxResponse = await placeFtxOrder(ftxBid.price, ftxEthWallet.total, ftxUs);
-            console.log(ftxResponse);
+            //console.log(`Selling ${ftxEthWallet.total} ETH for ${ftxBid.price}`);
+            const ethSize = getEthSizeToBuy(tradeSize, cbpAsk.price, cbpUsdWallet.total);
+            console.log(`Buying ${ethSize} ETH for ${cbpAsk.price}`);
+            const cbpResponse = await placeCoinbaseOrder(cbpAsk.price, ethSize, cbpClient);
+            //const ftxResponse = await placeFtxOrder(ftxBid.price, ftxEthWallet.total, ftxUs);
+            console.log(cbpResponse);
           } else {
             console.log(tradeSize)
           }
@@ -72,9 +74,22 @@ function trade() {
 }
 
 function placeCoinbaseOrder(price, size, cli) {
-  return cli.placeOder({ side: 'buy', price, size, product_id: 'ETH-USD' });
+  return cli.placeOrder({ side: 'buy', price, size, product_id: 'ETH-USD' });
 }
 
 function placeFtxOrder(price, size, ftx) {
   return ftx.Orders.placeOrder(currencyPairs.ETH.USD, 'sell', price, 'market', size);
+}
+
+function getEthSizeToBuy(size, price, buyingPower) {
+  const absoluteCost = size * price;
+  // If there is more eth available than we can buy,
+  // we will calculate the largest position we can acquire.
+  // Otherwise we will clear the whole level.
+  console.log('Absolute Cost: ', absoluteCost, 'Cash ', buyingPower);
+  if (absoluteCost > buyingPower) {
+    console.log('Dividing', buyingPower/price)
+    return buyingPower/price;
+  }
+  return size;
 }
