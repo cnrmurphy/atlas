@@ -20,3 +20,16 @@ than we should. A naive implementation of our arbitrage strategy will attempt to
 runs the risk of clearing a level in the orderbook and forcing us to pay a higher price for each following exchange. Instead we should
 be sure never to just keep transacting after clearing a level in the orderbook and instead dicate our transaction based on a metric
 such as VWAP.
+## Why does it exist?
+It makes a lot of sense that this spatial arbitrage exists. Unlike traditional equity markets, the liquidity
+in crypto markets is very fragmented because of the amount of exchanges that exists. The consequence of this 
+is that each venue has differing amounts of liquidity. An exchange that has more liquidity will have better volume
+and therefore better price discovery. Furthermore, the properties of crypto currencies themselves make it difficult
+for prices accross exchanges to converge. For example, Bitcoin can take quite a while to transfer across exchanges.
+The price of Bitcoin is also very volatile. Therefore, there is a large amount of risk in arbitraging the pricing
+inefficiency away. Liquidity, high transactions fees, velocity of money, and volatility are all reasons why
+this pricing inefficiency exists. If larger market makers were to offer liquidity by trading this spatial arbitrage
+then it would likely disappear as prices across exchanges converge (it may always be there to some extend given some of
+the aforementioned factors). The reason for the lack of these larger market makers (such as institutions) is most likely
+due to the risk of keeping large amounts of capital on a crypto exchange (hacks run rampant and owners sometimes go rouge)
+and the difficulty of getting large amounts of capital on  crypto exchanges in the first place.
