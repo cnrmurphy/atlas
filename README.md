@@ -1,5 +1,5 @@
 # Atlas Trading System
-## Exchange Arbitrage
+## Spatial Arbitrage
 At times you will see the same asset trading at different prices on exchanges.
 For instance, on FTX you will often see the best bid price for ETH trading
 at 238.89 while on Coinbase Pro the best bid price for ETH will be trading at 238.81 - a .08 spread.
@@ -15,3 +15,8 @@ $5,000 on FTX and $5,000 on Coinbase Pro. If you are trading ETH then you should
 cash available. When you want to make a trade on the spreads, you will buy $2,500 worth of ETH on Coinbase Pro while selling
 $2,500 worth of ETH on FTX - effectively earning the spread across the exchanges. Now you will have $5,000 ETH on Coinbase Pro
 and $5,000 + {earned_spread} on FTX. In order to become delta neutral on each exchange, you will have to once again split your positions.
+The optimization we want to consider is buying/selling on the respective exchange such that we will not pay more for our transaction
+than we should. A naive implementation of our arbitrage strategy will attempt to become delta neutral by buying at the best price. This
+runs the risk of clearing a level in the orderbook and forcing us to pay a higher price for each following exchange. Instead we should
+be sure never to just keep transacting after clearing a level in the orderbook and instead dicate our transaction based on a metric
+such as VWAP.
