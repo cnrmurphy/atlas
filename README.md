@@ -22,9 +22,9 @@ be sure never to just keep transacting after clearing a level in the orderbook a
 such as VWAP.
 ## Why does it exist?
 It makes a lot of sense that this spatial arbitrage exists. Unlike traditional equity markets, the liquidity
-in crypto markets is very fragmented because of the amount of exchanges that exists. The consequence of this 
-is that each venue has differing amounts of liquidity. An exchange that has more liquidity will have better volume
-and therefore better price discovery. Furthermore, the properties of crypto currencies themselves make it difficult
+in crypto markets is very fragmented due the amount of exchanges that exist.
+Therefore, an exchange that has more liquidity will have better volume and as a result, better price discovery.
+Furthermore, the properties of crypto currencies themselves make it difficult
 for prices accross exchanges to converge. For example, Bitcoin can take quite a while to transfer across exchanges.
 The price of Bitcoin is also very volatile. Therefore, there is a large amount of risk in arbitraging the pricing
 inefficiency away. Liquidity, high transactions fees, velocity of money, and volatility are all reasons why
