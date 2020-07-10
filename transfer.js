@@ -12,6 +12,8 @@ const ftxApiSecret = process.env.FTX_API_SECRET;
 
 const ftxUs = new FTXUS({ key: ftxApiKey, secret: ftxApiSecret });
 
+const transferFromFtxToCoinbase = false;
+
 (async () => {
   try {
     const ftxWallet = ftxUs.Wallet;
@@ -30,8 +32,10 @@ const ftxUs = new FTXUS({ key: ftxApiKey, secret: ftxApiSecret });
     console.log(transferAmount, idx);
 
     const despositInfo = await cbpClient.depositCrypto({ currency: 'USDC' });
-    if (despositInfo.hasOwnProperty('address')) {
+    if (despositInfo.hasOwnProperty('address') && transferFromFtxToCoinbase) {
       const { address } = despositInfo;
+      const resp = await ftxUs.Wallet.requestWithdrawl('USDC', 5, address);
+      console.log(resp);
     }
   } catch (e) {
     console.log(e);
