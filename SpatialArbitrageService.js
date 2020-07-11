@@ -28,11 +28,13 @@ class SpatialArbitrageService {
     cbpWallet.eth = cbpBalances.find(({ currency }) => currency === 'ETH');
     cbpWallet.usd = cbpBalances.find(({ currency }) => currency === 'USD');
     cbpWallet.usdc = cbpBalances.find(({ currency }) => currency === 'USDC');
-    console.log(cbpWallet.usdc);
+    console.log(cbpWallet.usd);
+    console.log(ftxWallet.usd)
 
     // We always want to trade with USD on Coinbase so convert USDC to USD
-    if (Number(cbpWallet.usdc.balance) > 0) {
-      const conversionResponse = await this._transferService.convertCoinbaseCoin({ from: 'USDC', to: 'USD', amount: Number(cbpWallet.usdc.balance) });
+    if (Number.parseFloat(cbpWallet.usdc.balance).toFixed(2) > 0) {
+      const amount = Number.parseFloat(cbpWallet.usdc.balance).toFixed(2);
+      const conversionResponse = await this._transferService.convertCoinbaseCoin({ from: 'USDC', to: 'USD', amount });
       console.log(conversionResponse);
     }
 
@@ -48,13 +50,13 @@ class SpatialArbitrageService {
     }
 
     // If we have free usd on both accounts then we need to balance in order to remain delta neutral
-    if (ftxWallet.usd.free > 0 && Number(cbpWallet.usd.balance > 0)) {
+    if (ftxWallet.usd.free > 0 && Number(cbpWallet.usd.balance > 0) && !this._state[AWAITING_PROFIT_TRANSFER]) {
       let cbpUsdBalance = Number(cbpWallet.usd.balance);
       let ftxUsdBalance = ftxWallet.usd.free;
       let balances = [cbpUsdBalance, ftxUsdBalance];
       let [transferAmount, _] = this.getAmountToTransfer(balances);
       
-      if (ftxUsdBalance > cbpUsdBalance) {
+      if (Number.parseFloat(ftxUsdBalance).toFixed(2) > Number.parseFloat(cbpUsdBalance).toFixed(2)) {
         console.log(`Attempting to balance account by sending ${transferAmount} to Coinbase from FTX`);
         //const resp = await this._transferService.sendToCoinbase('USDC', transferAmount);
         //console.log(resp);
@@ -65,19 +67,14 @@ class SpatialArbitrageService {
         const resp = await this._transferService.sendToFtx('USDC', transferAmount);
         console.log(resp);
       } else {
-        throw new Error('Couldn\'t find correct wallet to transfer balances from');
+        console.warn('Couldn\'t find correct wallet to transfer balances from');
       }
 
-      this._setState()
+      this._setState(AWAITING_PROFIT_TRANSFER, true);
     }
-
-    //await ts.sendToCoinbase('ETH', .01);
-    //const conversionResponse = await ts.convertCoinbaseCoin({ from: 'USDC', to: 'USD', amount: 3 });
-    //const ethBalance = Number(cbpEthWallet.balance);
-    //console.log(ethBalance/2);
-    //const transferResponse = await ts.sendToFtx('ETH', Number.parseFloat(ethBalance/2).toFixed(8));
-    //console.log(transferResponse);
-    //console.log(conversionResponse);
+    this._setState(AWAITING_PROFIT_TRANSFER, true);
+    console.log(this._state);
+    this._recordTrade(ftxWallet.usd.free);
   }
 
   /*
@@ -101,7 +98,18 @@ class SpatialArbitrageService {
   }
 
   _setState(propName, val) {
-    this._state[propname] = val;
+    this._state[propName] = val;
+  }
+
+  async _recordTrade(profit) {
+    const r = await this._prisma.trade.create({
+      data: {
+        profit
+      }
+    });
+    await this._prisma.disconnect()
+
+    console.log(r);
   }
   
 }
