@@ -81,10 +81,40 @@ class SpatialArbitrageService {
     console.log(this._state);
     //this._recordTrade(ftxWallet.usd.free);
 
+    let bestBid;
+    let bestAsk;
+    let bestSize;
+
     while(!this._state[IN_TRADE]) {
-      await this._findTrade();
-      await sleep(3000);
+      [bestBid, bestAsk, bestSize] = await this._findTrade();
+
+      if (!this._state[IN_TRADE]) {
+        await sleep(2000);
+      }
     }
+
+    let cost = bestAsk * bestSize;
+
+    // If we can afford to buy the whole orderbook level, we will. Otherwise we buy a fraction of the available asset.
+    let amountToTrade = cost > cbpUsdBalance ? cbpUsdBalance / cost : bestSize;
+
+    if (ftxEthWallet.total > 0) {
+      console.log(`Buying ${amountToTrade} ETH for ${bestAsk.price} on Coinbase Pro`);
+      console.log(`Selling ${amountToTrade} ETH for ${bestBid.price} on FTX`)
+      const [cbpResponse, ftxResponse] = await Promise.all([
+        this._coinbaseClient.placeOrder({ side: 'buy', price: bestAsk.price, size: amountToTrade, product_id: 'ETH-USD' }),
+        this.ftxClient.Orders.placeOrder(currencyPairs.ETH.USD, 'sell', bestBid.price, 'market', size)
+      ]);
+
+      if (!cbpResponse.hasOwnProperty('filled_size') && !ftxResponse.hasOwnProperty('filledSize')) {
+        console.log(cbpResponse, ftxResponse);
+        throw new Error('Trade failed');
+      }
+
+      console.log(cbpResponse, ftxResponse);
+    }
+
+    console.log('BEST BID', bestBid, bestAsk);
   }
 
   async _findTrade() {
@@ -100,9 +130,11 @@ class SpatialArbitrageService {
       const tradeSize = Math.min(ftxBid.size, cbpAsk.size);
       const ftxPrice = (ftxBid.price * tradeSize) - ((ftxBid.price * tradeSize) * .003);
       const cbpPrice = (cbpAsk.price * tradeSize) - ((cbpAsk.price * tradeSize) * .005);
-      console.log(`Bid: ${ftxBid.price} | Ask: ${cbpAsk.price} | spread: ${Math.abs(cbpAsk.price - ftxBid.price)} | ftxPrice: ${ftxPrice} | cbpPrice: ${cbpPrice} | profit: ${ftxPrice - cbpPrice} | profit before fees: ${(ftxBid.price * tradeSize) - (cbpAsk.price * tradeSize)}`);
-      this._setState(IN_TRADE, true);
+      console.log(`Bid: ${ftxBid.price} | Ask: ${cbpAsk.price} | spread: ${Math.abs(cbpAsk.price - ftxBid.price)} | size: ${tradeSize} | ftxPrice: ${ftxPrice} | cbpPrice: ${cbpPrice} | profit: ${ftxPrice - cbpPrice} | profit before fees: ${(ftxBid.price * tradeSize) - (cbpAsk.price * tradeSize)}`);
+      this._setState(IN_TRADE, true); 
+      return [ftxBid, cbpAsk, tradeSize];
     }
+    return [0, 0, 0];
   }
 
   /*
