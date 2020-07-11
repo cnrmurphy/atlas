@@ -17,4 +17,4 @@ const ftxApiSecret = process.env.FTX_API_SECRET;
 const ftxUs = new FTXUS({ key: ftxApiKey, secret: ftxApiSecret });
 
 const atlas = new Atlas(cbpClient, ftxUs, null);
-atlas.SpatialArbitrageService.execute();
+atlas.SpatialArbitrage.execute();
