@@ -1,3 +1,5 @@
+const { PrismaClient } = require("@prisma/client");
+
 // Import API Clients
 const { FTXUS, currencyPairs } = require('ftx-us');
 const CoinbasePro = require('coinbase-pro');
@@ -16,5 +18,7 @@ const ftxApiKey = process.env.FTX_API_KEY;
 const ftxApiSecret = process.env.FTX_API_SECRET;
 const ftxUs = new FTXUS({ key: ftxApiKey, secret: ftxApiSecret });
 
-const atlas = new Atlas(cbpClient, ftxUs, null);
+const prisma = new PrismaClient();
+
+const atlas = new Atlas(cbpClient, ftxUs, prisma);
 atlas.SpatialArbitrage.execute();
