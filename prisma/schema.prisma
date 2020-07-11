@@ -8,9 +8,9 @@ datasource db {
 }
 
 model Trade {
-  created_at DateTime
-  id         Int      @default(autoincrement()) @id
-  profit     Float?
+  createdAt DateTime @default(now())
+  id        Int      @default(autoincrement()) @id
+  profit    Float?
 
   @@index([id], name: "trades_id_idx")
 }
