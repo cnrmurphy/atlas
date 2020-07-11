@@ -3,9 +3,11 @@ const { currencyPairs }= require('ftx-us');
 const AWAITING_PROFIT_TRANSFER = 'awaitingProfitTransfer';
 const IN_TRADE = 'inTrade';
 const CURRENT_TRADE_ID = 'currentTradeId';
+const FTX_TAKER_FEE = .003;
+const CBP_TAKER_FEE = .005;
 
-const Bid = (price, size) => ({ price, size });
-const Ask = (price, size) => ({ price, size })
+const Bid = (price, size, exchange) => ({ price, size, exchange });
+const Ask = (price, size, exchange) => ({ price, size, exchange })
 
 class SpatialArbitrageService {
   constructor(coinbaseClient, ftxClient, transferService, prisma) {
@@ -55,12 +57,14 @@ class SpatialArbitrageService {
     }
 
     // If we have free usd on both accounts then we need to balance in order to remain delta neutral
-    if (ftxWallet.usd.free > 0 && Number(cbpWallet.usd.balance > 0) && !this._state[AWAITING_PROFIT_TRANSFER]) {
+    if (ftxWallet.usd.free > 0 && Number(cbpWallet.usd.balance > 0) && Number.parseFloat(ftxWallet.eth.free) === 0 && !this._state[AWAITING_PROFIT_TRANSFER]) {
       let cbpUsdBalance = Number(cbpWallet.usd.balance);
       let ftxUsdBalance = ftxWallet.usd.free;
       let balances = [cbpUsdBalance, ftxUsdBalance];
       let [transferAmount, _] = this.getAmountToTransfer(balances);
-      
+
+      console.log('BALANCE', cbpUsdBalance);
+      console.log(Number.parseFloat(ftxWallet.eth.free));
       if (Number.parseFloat(ftxUsdBalance).toFixed(2) > Number.parseFloat(cbpUsdBalance).toFixed(2)) {
         console.log(`Attempting to balance account by sending ${transferAmount} to Coinbase from FTX`);
         //const resp = await this._transferService.sendToCoinbase('USDC', transferAmount);
@@ -84,34 +88,61 @@ class SpatialArbitrageService {
     let bestBid;
     let bestAsk;
     let bestSize;
+    let spread;
 
     while(!this._state[IN_TRADE]) {
-      [bestBid, bestAsk, bestSize] = await this._findTrade();
+      [bestBid, bestAsk, bestSize, spread] = await this._findTrade();
 
       if (!this._state[IN_TRADE]) {
         await sleep(2000);
       }
     }
 
+    let cbpUsdBalance = Number(cbpWallet.usd.balance);
+    let ftxUsdBalance = ftxWallet.usd.free;
     let cost = bestAsk * bestSize;
 
     // If we can afford to buy the whole orderbook level, we will. Otherwise we buy a fraction of the available asset.
     let amountToTrade = cost > cbpUsdBalance ? cbpUsdBalance / cost : bestSize;
 
-    if (ftxEthWallet.total > 0) {
-      console.log(`Buying ${amountToTrade} ETH for ${bestAsk.price} on Coinbase Pro`);
-      console.log(`Selling ${amountToTrade} ETH for ${bestBid.price} on FTX`)
-      const [cbpResponse, ftxResponse] = await Promise.all([
-        this._coinbaseClient.placeOrder({ side: 'buy', price: bestAsk.price, size: amountToTrade, product_id: 'ETH-USD' }),
-        this.ftxClient.Orders.placeOrder(currencyPairs.ETH.USD, 'sell', bestBid.price, 'market', size)
-      ]);
+    if (ftxWallet.eth.free > 0) {
+      console.log(`Buying ${amountToTrade} ETH for ${bestAsk.price} on ${bestAsk.exchange}`);
+      console.log(`Selling ${amountToTrade} ETH for ${bestBid.price} on ${bestBid.exchange}`);
 
-      if (!cbpResponse.hasOwnProperty('filled_size') && !ftxResponse.hasOwnProperty('filledSize')) {
+      // Determine what exchange to place orders on
+      // If the coinbase bid is larger than the FTX ask we
+      // should buy ETH on FTX and sell ETH on coinbase
+      if (bestAsk.exchange === 'FTX') {
+        const [cbpResponse, ftxResponse] = await Promise.all([
+          this._coinbaseClient.placeOrder({ side: 'sell', price: bestBid.price, size: amountToTrade, product_id: 'ETH-USD' }),
+          this._ftxClient.Orders.placeOrder(currencyPairs.ETH.USD, 'buy', bestAsk.price, 'market', size)
+        ]);
+
+        if (!cbpResponse.hasOwnProperty('filled_size') && !ftxResponse.hasOwnProperty('filledSize')) {
+          console.log(cbpResponse, ftxResponse);
+          throw new Error('Trade failed');
+        }
+
         console.log(cbpResponse, ftxResponse);
-        throw new Error('Trade failed');
       }
 
-      console.log(cbpResponse, ftxResponse);
+      // If the bid on FTX is larger than the ask on coinbase
+      // we should buy ETH on coinbase and sell ETH on FTX
+      if (bestBid.exchange === 'Coinbase') {
+        const [cbpResponse, ftxResponse] = await Promise.all([
+          this._coinbaseClient.placeOrder({ side: 'buy', price: bestAsk.price, size: amountToTrade, product_id: 'ETH-USD' }),
+          this._ftxClient.Orders.placeOrder(currencyPairs.ETH.USD, 'sell', bestBid.price, 'market', size)
+        ]);
+
+        if (!cbpResponse.hasOwnProperty('filled_size') && !ftxResponse.hasOwnProperty('filledSize')) {
+          console.log(cbpResponse, ftxResponse);
+          throw new Error('Trade failed');
+        }
+        
+        console.log(cbpResponse, ftxResponse);
+      }
+
+      this._recordTrade(spread);
     }
 
     console.log('BEST BID', bestBid, bestAsk);
@@ -120,19 +151,38 @@ class SpatialArbitrageService {
   async _findTrade() {
     const [ftxOrderBook, cbpOrderBook] = await Promise.all([this._ftxClient.Markets.getOrderBook(currencyPairs.ETH.USD), this._coinbaseClient.getProductOrderBook('ETH-USD')]);
     const bestFtxBid = ftxOrderBook.bids[0];
+    const bestFtxAsk = ftxOrderBook.asks[0];
+    const bestCbpBid = cbpOrderBook.bids[0];
     const bestCbpAsk = cbpOrderBook.asks[0];
-    const ftxBid = Bid(bestFtxBid[0], bestFtxBid[1]);
-    const cbpAsk = Ask(bestCbpAsk[0], bestCbpAsk[1]);
-    const spread = Math.abs(ftxBid.price - cbpAsk.price);
-    console.log('Looking for trade');
-    // The spread must favor our trade to continue
-    if (ftxBid.price > cbpAsk.price && spread >= .05) {
-      const tradeSize = Math.min(ftxBid.size, cbpAsk.size);
-      const ftxPrice = (ftxBid.price * tradeSize) - ((ftxBid.price * tradeSize) * .003);
-      const cbpPrice = (cbpAsk.price * tradeSize) - ((cbpAsk.price * tradeSize) * .005);
-      console.log(`Bid: ${ftxBid.price} | Ask: ${cbpAsk.price} | spread: ${Math.abs(cbpAsk.price - ftxBid.price)} | size: ${tradeSize} | ftxPrice: ${ftxPrice} | cbpPrice: ${cbpPrice} | profit: ${ftxPrice - cbpPrice} | profit before fees: ${(ftxBid.price * tradeSize) - (cbpAsk.price * tradeSize)}`);
-      this._setState(IN_TRADE, true); 
-      return [ftxBid, cbpAsk, tradeSize];
+    const ftxBid = Bid(bestFtxBid[0], bestFtxBid[1], 'FTX');
+    const ftxAsk = Ask(bestFtxAsk[0], bestFtxAsk[1], 'FTX');
+    const cbpAsk = Ask(bestCbpAsk[0], bestCbpAsk[1], 'Coinbase');
+    const cbpBid = Bid(bestCbpBid[0], bestCbpBid[1], 'Coinbase');
+    console.log(`${+new Date()} Looking for trade`);
+
+    if (ftxAsk.price < cbpBid.price) {
+      const spread = Math.abs(ftxAsk.price - cbpBid.price);
+      if (spread >= .05) {
+        const tradeSize = Math.min(ftxAsk.size, cbpBid.size);
+        const ftxPrice = (ftxAsk.price * tradeSize) - ((ftxAsk.price * tradeSize) * FTX_TAKER_FEE);
+        const cbpPrice = (cbpBid.price * tradeSize) - ((cbpBid.price * tradeSize) * CBP_TAKER_FEE);
+        console.log(`${+new Date()} Trade Found`);
+        console.log(`Bid: ${cbpBid.price} | Ask: ${ftxAsk.price} | spread: ${spread} | size: ${tradeSize}`);
+        this._setState(IN_TRADE, true);
+        return [cbpBid, ftxAsk, tradeSize];
+      }
+    }
+    if (ftxBid.price > cbpAsk.price) {
+      const spread = Math.abs(ftxBid.price - cbpAsk.price);
+      if (spread >= .05) {
+        const tradeSize = Math.min(ftxBid.size, cbpAsk.size);
+        const ftxPrice = (ftxBid.price * tradeSize) - ((ftxBid.price * tradeSize) * .003);
+        const cbpPrice = (cbpAsk.price * tradeSize) - ((cbpAsk.price * tradeSize) * .005);
+        console.log(`${+new Date()} Trade Found`);
+        console.log(`Bid: ${ftxBid.price} | Ask: ${cbpAsk.price} | spread: ${Math.abs(cbpAsk.price - ftxBid.price)} | size: ${tradeSize} | ftxPrice: ${ftxPrice} | cbpPrice: ${cbpPrice} | profit: ${ftxPrice - cbpPrice} | profit before fees: ${(ftxBid.price * tradeSize) - (cbpAsk.price * tradeSize)}`);
+        this._setState(IN_TRADE, true); 
+        return [ftxBid, cbpAsk, tradeSize];
+      }
     }
     return [0, 0, 0];
   }
@@ -170,6 +220,10 @@ class SpatialArbitrageService {
     await this._prisma.disconnect()
 
     console.log(r);
+  }
+
+  async _balanceAccounts() {
+    
   }
   
 }
