@@ -10,7 +10,7 @@ class Atlas {
     this._spatialArbitrageService  = new SpatialArbitrageService(coinbaseClient, ftxClient, this._transferService, db);
   }
 
-  get SpatialArbitrageService() {
+  get SpatialArbitrage() {
     return this._spatialArbitrageService;
   }
 }
