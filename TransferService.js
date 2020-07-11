@@ -54,6 +54,7 @@ class TransferService {
     if (!from || !to) {
       throw new Error(`Must provide the currency names you want to transfer: from=${from} | to=${to}`);
     }
+    console.log(`Coverting ${amount} ${from} to ${to}`);
     const resp = await this._coinbaseClient.convert({
       from,
       to,
