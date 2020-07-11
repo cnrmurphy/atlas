@@ -23,10 +23,8 @@ class SpatialArbitrageService {
     this._lastTrade = null;
   }
 
-  async execute() {
-    // Get balances from each exchange
+  async _getBalances() {
     const [ftxBalances, cbpBalances] = await Promise.all([await this._ftxClient.Wallet.getBalances(), await this._coinbaseClient.getAccounts()]);
-
     // Get each coin wallet from API responses
     const cbpWallet = {};
     const ftxWallet = {};
@@ -35,55 +33,22 @@ class SpatialArbitrageService {
     cbpWallet.eth = cbpBalances.find(({ currency }) => currency === 'ETH');
     cbpWallet.usd = cbpBalances.find(({ currency }) => currency === 'USD');
     cbpWallet.usdc = cbpBalances.find(({ currency }) => currency === 'USDC');
+
+    return { cbpWallet, ftxWallet };
+
+  }
+  async execute() {
+    // Get balances from each exchange
+    const { cbpWallet, ftxWallet } = await this._getBalances();
     console.log(cbpWallet.usd);
     console.log(ftxWallet.usd)
 
     // We always want to trade with USD on Coinbase so convert USDC to USD
     if (Number.parseFloat(cbpWallet.usdc.balance).toFixed(2) > 0) {
-      const amount = Number.parseFloat(cbpWallet.usdc.balance).toFixed(2);
-      const conversionResponse = await this._transferService.convertCoinbaseCoin({ from: 'USDC', to: 'USD', amount });
-      console.log(conversionResponse);
+      //const amount = Number.parseFloat(cbpWallet.usdc.balance).toFixed(2);
+      //const conversionResponse = await this._transferService.convertCoinbaseCoin({ from: 'USDC', to: 'USD', amount });
+      //console.log(conversionResponse);
     }
-
-    // We want all of our ETH on FTX so if we have extra on Coinbase we need to transfer it
-    if (Number(cbpWallet.eth.balance) > 0) {
-      const transferResponse = await this._transferService.sendToFtx('ETH', Number.parseFloat(cbpWallet.eth.balance).toFixed(8));
-      console.log(transferResponse);
-    }
-
-    if (ftxWallet.usd.free > 0) {
-      //const response = await this._transferService.sendToCoinbase('USDC', 1);
-      //console.log(response);
-    }
-
-    // If we have free usd on both accounts then we need to balance in order to remain delta neutral
-    if (ftxWallet.usd.free > 0 && Number(cbpWallet.usd.balance > 0) && Number.parseFloat(ftxWallet.eth.free) === 0 && !this._state[AWAITING_PROFIT_TRANSFER]) {
-      let cbpUsdBalance = Number(cbpWallet.usd.balance);
-      let ftxUsdBalance = ftxWallet.usd.free;
-      let balances = [cbpUsdBalance, ftxUsdBalance];
-      let [transferAmount, _] = this.getAmountToTransfer(balances);
-
-      console.log('BALANCE', cbpUsdBalance);
-      console.log(Number.parseFloat(ftxWallet.eth.free));
-      if (Number.parseFloat(ftxUsdBalance).toFixed(2) > Number.parseFloat(cbpUsdBalance).toFixed(2)) {
-        console.log(`Attempting to balance account by sending ${transferAmount} to Coinbase from FTX`);
-        //const resp = await this._transferService.sendToCoinbase('USDC', transferAmount);
-        //console.log(resp);
-      } else if (cbpUsdBalance > ftxUsdBalance) {
-        console.log(`Attemping to balance account by sending ${transferAmount} to FTX from Coinbase`);
-        const conversionResponse = await this._transferService.convertCoinbaseCoin({ from: 'USDC', to: 'USD', amount: transferAmount });
-        console.log(conversionResponse);
-        const resp = await this._transferService.sendToFtx('USDC', transferAmount);
-        console.log(resp);
-      } else {
-        console.warn('Couldn\'t find correct wallet to transfer balances from');
-      }
-
-      this._setState(AWAITING_PROFIT_TRANSFER, true);
-    }
-    this._setState(AWAITING_PROFIT_TRANSFER, true);
-    console.log(this._state);
-    //this._recordTrade(ftxWallet.usd.free);
 
     let bestBid;
     let bestAsk;
@@ -105,17 +70,17 @@ class SpatialArbitrageService {
     // If we can afford to buy the whole orderbook level, we will. Otherwise we buy a fraction of the available asset.
     let amountToTrade = cost > cbpUsdBalance ? cbpUsdBalance / cost : bestSize;
 
-    if (ftxWallet.eth.free > 0) {
-      console.log(`Buying ${amountToTrade} ETH for ${bestAsk.price} on ${bestAsk.exchange}`);
-      console.log(`Selling ${amountToTrade} ETH for ${bestBid.price} on ${bestBid.exchange}`);
+    console.log(`Buying ${amountToTrade} ETH for ${bestAsk.price} on ${bestAsk.exchange}`);
+    console.log(`Selling ${amountToTrade} ETH for ${bestBid.price} on ${bestBid.exchange}`);
 
-      // Determine what exchange to place orders on
-      // If the coinbase bid is larger than the FTX ask we
-      // should buy ETH on FTX and sell ETH on coinbase
-      if (bestAsk.exchange === 'FTX') {
+    // Determine what exchange to place orders on
+    // If the coinbase bid is larger than the FTX ask we
+    // should buy ETH on FTX and sell ETH on coinbase
+    if (bestAsk.exchange === 'FTX') {
+      try {
         const [cbpResponse, ftxResponse] = await Promise.all([
           this._coinbaseClient.placeOrder({ side: 'sell', price: bestBid.price, size: amountToTrade, product_id: 'ETH-USD' }),
-          this._ftxClient.Orders.placeOrder(currencyPairs.ETH.USD, 'buy', bestAsk.price, 'market', size)
+          this._ftxClient.Orders.placeOrder(currencyPairs.ETH.USD, 'buy', bestAsk.price, 'market', amountToTrade)
         ]);
 
         if (!cbpResponse.hasOwnProperty('filled_size') && !ftxResponse.hasOwnProperty('filledSize')) {
@@ -123,27 +88,41 @@ class SpatialArbitrageService {
           throw new Error('Trade failed');
         }
 
+        // 1. Send ETH from FTX to Coinbase
+        // 2. On Coinbase, convert USD to USDC
+        // 3. Send USDC from Coinbase to FTX
+        const ethToCoinbaseResp = await this._transferService.sendToCoinbase('ETH', ftxWallet.eth.free);
+        console.log(ethToCoinbaseResp);
+        const convertAmount = Number.parseFloat(cbpWallet.usd.balance).toFixed(2)
+        const conversionResponse = await this._transferService.convertCoinbaseCoin({ from: 'USD', to: 'USDC', amount: convertAmount });
+        console.log(conversionResponse);
+        const transferResponse = await this._transferService.sendToFtx('USDC', conversionResponse.amount);
+        console.log(transferResponse);
         console.log(cbpResponse, ftxResponse);
+        this._recordTrade(spread);
+      } catch(e) {
+        console.log(e);
       }
-
-      // If the bid on FTX is larger than the ask on coinbase
-      // we should buy ETH on coinbase and sell ETH on FTX
-      if (bestBid.exchange === 'Coinbase') {
-        const [cbpResponse, ftxResponse] = await Promise.all([
-          this._coinbaseClient.placeOrder({ side: 'buy', price: bestAsk.price, size: amountToTrade, product_id: 'ETH-USD' }),
-          this._ftxClient.Orders.placeOrder(currencyPairs.ETH.USD, 'sell', bestBid.price, 'market', size)
-        ]);
-
-        if (!cbpResponse.hasOwnProperty('filled_size') && !ftxResponse.hasOwnProperty('filledSize')) {
-          console.log(cbpResponse, ftxResponse);
-          throw new Error('Trade failed');
-        }
-        
-        console.log(cbpResponse, ftxResponse);
-      }
-
-      this._recordTrade(spread);
     }
+
+    // If the bid on FTX is larger than the ask on coinbase
+    // we should buy ETH on coinbase and sell ETH on FTX
+    if (bestBid.exchange === 'Coinbase') {
+      console.log('ignore trade')
+      // const [cbpResponse, ftxResponse] = await Promise.all([
+      //   this._coinbaseClient.placeOrder({ side: 'buy', price: bestAsk.price, size: amountToTrade, product_id: 'ETH-USD' }),
+      //   this._ftxClient.Orders.placeOrder(currencyPairs.ETH.USD, 'sell', bestBid.price, 'market', size)
+      // ]);
+
+      // if (!cbpResponse.hasOwnProperty('filled_size') && !ftxResponse.hasOwnProperty('filledSize')) {
+      //   console.log(cbpResponse, ftxResponse);
+      //   throw new Error('Trade failed');
+      // }
+      
+      // console.log(cbpResponse, ftxResponse);
+    }
+
+    //this._recordTrade(spread);
 
     console.log('BEST BID', bestBid, bestAsk);
   }
@@ -223,7 +202,7 @@ class SpatialArbitrageService {
   }
 
   async _balanceAccounts() {
-    
+
   }
   
 }
