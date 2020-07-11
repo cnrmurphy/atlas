@@ -1,6 +1,11 @@
+const { currencyPairs }= require('ftx-us');
+
 const AWAITING_PROFIT_TRANSFER = 'awaitingProfitTransfer';
 const IN_TRADE = 'inTrade';
 const CURRENT_TRADE_ID = 'currentTradeId';
+
+const Bid = (price, size) => ({ price, size });
+const Ask = (price, size) => ({ price, size })
 
 class SpatialArbitrageService {
   constructor(coinbaseClient, ftxClient, transferService, prisma) {
@@ -74,7 +79,30 @@ class SpatialArbitrageService {
     }
     this._setState(AWAITING_PROFIT_TRANSFER, true);
     console.log(this._state);
-    this._recordTrade(ftxWallet.usd.free);
+    //this._recordTrade(ftxWallet.usd.free);
+
+    while(!this._state[IN_TRADE]) {
+      await this._findTrade();
+      await sleep(3000);
+    }
+  }
+
+  async _findTrade() {
+    const [ftxOrderBook, cbpOrderBook] = await Promise.all([this._ftxClient.Markets.getOrderBook(currencyPairs.ETH.USD), this._coinbaseClient.getProductOrderBook('ETH-USD')]);
+    const bestFtxBid = ftxOrderBook.bids[0];
+    const bestCbpAsk = cbpOrderBook.asks[0];
+    const ftxBid = Bid(bestFtxBid[0], bestFtxBid[1]);
+    const cbpAsk = Ask(bestCbpAsk[0], bestCbpAsk[1]);
+    const spread = Math.abs(ftxBid.price - cbpAsk.price);
+    console.log('Looking for trade');
+    // The spread must favor our trade to continue
+    if (ftxBid.price > cbpAsk.price && spread >= .05) {
+      const tradeSize = Math.min(ftxBid.size, cbpAsk.size);
+      const ftxPrice = (ftxBid.price * tradeSize) - ((ftxBid.price * tradeSize) * .003);
+      const cbpPrice = (cbpAsk.price * tradeSize) - ((cbpAsk.price * tradeSize) * .005);
+      console.log(`Bid: ${ftxBid.price} | Ask: ${cbpAsk.price} | spread: ${Math.abs(cbpAsk.price - ftxBid.price)} | ftxPrice: ${ftxPrice} | cbpPrice: ${cbpPrice} | profit: ${ftxPrice - cbpPrice} | profit before fees: ${(ftxBid.price * tradeSize) - (cbpAsk.price * tradeSize)}`);
+      this._setState(IN_TRADE, true);
+    }
   }
 
   /*
@@ -112,6 +140,10 @@ class SpatialArbitrageService {
     console.log(r);
   }
   
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 module.exports = SpatialArbitrageService;
