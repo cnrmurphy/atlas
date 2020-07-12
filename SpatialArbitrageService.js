@@ -4,7 +4,7 @@ const AWAITING_PROFIT_TRANSFER = 'awaitingProfitTransfer';
 const IN_TRADE = 'inTrade';
 const CURRENT_TRADE_ID = 'currentTradeId';
 const FTX_TAKER_FEE = .003;
-const CBP_TAKER_FEE = .005;
+const CBP_TAKER_FEE = .0025;
 
 const Bid = (price, size, exchange) => ({ price, size, exchange });
 const Ask = (price, size, exchange) => ({ price, size, exchange })
@@ -193,13 +193,15 @@ class SpatialArbitrageService {
 
     if (ftxAsk.price < cbpBid.price) {
       const spread = Math.abs(ftxAsk.price - cbpBid.price);
-      if (spread >= .05) {
+      const ftxPrice = (ftxAsk.price * tradeSize) - ((ftxAsk.price * tradeSize) * FTX_TAKER_FEE);
+      const cbpPrice = (cbpBid.price * tradeSize) - ((cbpBid.price * tradeSize) * CBP_TAKER_FEE);
+      const cost = ftxPrice + cbpPrice;
+      const profit = spread * bestSize;
+      if (spread >= .05 && profit > cost) {
         console.log('Trade: Buy FTX, sell Coinbase');
         const tradeSize = Math.min(ftxAsk.size, cbpBid.size);
-        const ftxPrice = (ftxAsk.price * tradeSize) - ((ftxAsk.price * tradeSize) * FTX_TAKER_FEE);
-        const cbpPrice = (cbpBid.price * tradeSize) - ((cbpBid.price * tradeSize) * CBP_TAKER_FEE);
         console.log(`${+new Date()} Trade Found`);
-        console.log(`Bid: ${cbpBid.price} | Ask: ${ftxAsk.price} | spread: ${spread} | size: ${tradeSize}`);
+        console.log(`Bid: ${cbpBid.price} | Ask: ${ftxAsk.price} | spread: ${spread} | size: ${tradeSize} | profit: ${profit}`);
         this._setState(IN_TRADE, true);
         return [cbpBid, ftxAsk, tradeSize, spread];
       }
