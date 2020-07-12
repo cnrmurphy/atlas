@@ -22,4 +22,15 @@ const prisma = new PrismaClient();
 
 const atlas = new Atlas(cbpClient, ftxUs, prisma);
 
-atlas.SpatialArbitrage.execute();
+(async () => {
+  const { cbpWallet, ftxWallet } = await atlas.SpatialArbitrage._getBalances();
+  let convertAmount = cbpWallet.usd.balance;
+  let idx = convertAmount.indexOf('.');
+  convertAmount = convertAmount.substring(0,idx+3);
+  console.log(cbpWallet.usd)
+  console.log(convertAmount);
+  const conversionResponse = await atlas.SpatialArbitrage._transferService.convertCoinbaseCoin({ from: 'USD', to: 'USDC', amount: convertAmount });
+  console.log(conversionResponse);
+  const transferResponse = await atlas.SpatialArbitrage._transferService.sendToFtx('USDC', Number.parseFloat(conversionResponse.response.amount).toFixed(2));
+  console.log(transferResponse);
+})();
