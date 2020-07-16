@@ -7,7 +7,7 @@ class Atlas {
     this._coinbaseClient = coinbaseClient;
     this._ftxClient = ftxClient;
     this._transferService = new TransferService(coinbaseClient, ftxClient);
-    this._spatialArbitrageService  = new SpatialArbitrageService(coinbaseClient, ftxClient, this._transferService, prisma);
+    this._spatialArbitrageService  = new SpatialArbitrageService.TakerService(coinbaseClient, ftxClient, this._transferService, prisma);
   }
 
   get SpatialArbitrage() {
