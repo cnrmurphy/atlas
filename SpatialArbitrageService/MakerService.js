@@ -12,8 +12,8 @@ const CBP_MAKER_FEE = 0.0015;
 const Bid = (price, size, exchange) => ({ price, size, exchange });
 const Ask = (price, size, exchange) => ({ price, size, exchange });
 
-const logMsg(msg) {
-  console.log(`${+new Date()}: ${msg}}`);
+const logMsg = msg => {
+  console.log(`${+new Date()}: ${msg}`);
 }
 
 class MakerService {
@@ -48,7 +48,7 @@ class MakerService {
     while(true) {
       // Get balances from each exchange
       const { cbpWallet, ftxWallet } = await this._getBalances();
-      console.log('Beginning trade sequence');
+      logMsg('Beginning trade sequence');
 
       let bestBid;
       let bestAsk;
@@ -70,7 +70,7 @@ class MakerService {
       tradeProfit -= (tradeProfit * (CBP_TAKER_FEE + FTX_TAKER_FEE));
 
       if(!bestAsk) {
-        console.log('best ask is undefined');
+        logMsg('best ask is undefined');
         console.log(this._state);
         this._setState(IN_TRADE, false);
       }
@@ -84,8 +84,7 @@ class MakerService {
         let amountToTradeCbp = Math.min(Number.parseFloat(cbpWallet.eth.balance), bestSize);
         let amountToTrade = Math.min(amountToTradeFTX, amountToTradeCbp);
 
-        console.log(`Buying ${amountToTrade} ETH for ${bestAsk.price} on ${bestAsk.exchange}`);
-        console.log(`Selling ${amountToTrade} ETH for ${bestBid.price} on ${bestBid.exchange}`);
+        logMsg(`Buying ${amountToTrade} ETH for ${bestAsk.price} on ${bestAsk.exchange}\nSelling ${amountToTrade} ETH for ${bestBid.price} on ${bestBid.exchange}`);
         try {
           const [cbpResponse, ftxResponse] = await Promise.all([
             this._coinbaseClient.placeOrder({ side: 'sell', price: bestBid.price, size: amountToTrade, product_id: 'ETH-USD' }),
@@ -166,7 +165,8 @@ class MakerService {
     const ftxAsk = Ask(bestFtxAsk[0], bestFtxAsk[1], 'FTX');
     const cbpAsk = Ask(bestCbpAsk[0], bestCbpAsk[1], 'Coinbase');
     const cbpBid = Bid(bestCbpBid[0], bestCbpBid[1], 'Coinbase');
-    console.log(`${+new Date()} Looking for trade`);
+    
+    logMsg(`Looking for trade`);
 
     if (ftxAsk.price < cbpBid.price) {
       const tradeSize = Math.min(ftxAsk.size, cbpBid.size);
@@ -175,11 +175,10 @@ class MakerService {
       const cbpPrice = (cbpBid.price * tradeSize) * CBP_TAKER_FEE;
       const cost = ftxPrice + cbpPrice;
       const profit = spread * tradeSize;
-      console.log(`Buy FTX, sell Coinbase - Coinbase: price: ${cbpBid.price * tradeSize} cost: ${cbpPrice} | FTX Price: price: ${ftxAsk.price * tradeSize} - cost ${ftxPrice} | Spread: ${spread} | size: ${tradeSize} | Profit: ${profit} | Cost: ${cost} | Return: ${profit - cost}`);
+      logMsg(`Buy FTX, sell Coinbase - Coinbase: price: ${cbpBid.price * tradeSize} cost: ${cbpPrice} | FTX Price: price: ${ftxAsk.price * tradeSize} - cost ${ftxPrice} | Spread: ${spread} | size: ${tradeSize} | Profit: ${profit} | Cost: ${cost} | Return: ${profit - cost}`);
       if (spread >= .05 && profit > cost) {
-        console.log('Trade: Buy FTX, sell Coinbase');
-        console.log(`${+new Date()} Trade Found`);
-        console.log(`Bid: ${cbpBid.price} | Ask: ${ftxAsk.price} | spread: ${spread} | size: ${tradeSize} | profit: ${profit}`);
+        logMsg('Trade Found: Buy FTX, sell Coinbase');
+        logMsg(`Bid: ${cbpBid.price} | Ask: ${ftxAsk.price} | spread: ${spread} | size: ${tradeSize} | profit: ${profit}`);
         this._setState(IN_TRADE, true);
         return [cbpBid, ftxAsk, tradeSize, spread];
       }
