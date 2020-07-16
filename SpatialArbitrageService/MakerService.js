@@ -1,5 +1,6 @@
 const { currencyPairs }= require('ftx-us');
 
+const SHOULD_TRADE = false;
 const AWAITING_PROFIT_TRANSFER = 'awaitingProfitTransfer';
 const IN_TRADE = 'inTrade';
 const CURRENT_TRADE_ID = 'currentTradeId';
@@ -77,7 +78,7 @@ class MakerService {
       // Determine what exchange to place orders on
       // If the coinbase bid is larger than the FTX ask we
       // should buy ETH on FTX and sell ETH on coinbase
-      if (bestAsk && bestAsk.exchange === 'FTX') {
+      if (bestAsk && bestAsk.exchange === 'FTX' && SHOULD_TRADE) {
         // If we can afford to buy the whole orderbook level, we will. Otherwise we buy a fraction of the available asset.
         let amountToTradeFTX = cost > ftxUsdBalance ? ftxUsdBalance / cost : bestSize;
         let amountToTradeCbp = Math.min(Number.parseFloat(cbpWallet.eth.balance), bestSize);
@@ -150,25 +151,6 @@ class MakerService {
           console.log(e);
         }
       }
-
-      // If the bid on FTX is larger than the ask on coinbase
-      // we should buy ETH on coinbase and sell ETH on FTX
-      if (bestBid && bestBid.exchange === 'Coinbase') {
-        console.log('ignore trade')
-        // const [cbpResponse, ftxResponse] = await Promise.all([
-        //   this._coinbaseClient.placeOrder({ side: 'buy', price: bestAsk.price, size: amountToTrade, product_id: 'ETH-USD' }),
-        //   this._ftxClient.Orders.placeOrder(currencyPairs.ETH.USD, 'sell', bestBid.price, 'market', size)
-        // ]);
-
-        // if (!cbpResponse.hasOwnProperty('filled_size') && !ftxResponse.hasOwnProperty('filledSize')) {
-        //   console.log(cbpResponse, ftxResponse);
-        //   throw new Error('Trade failed');
-        // }
-        
-        // console.log(cbpResponse, ftxResponse);
-      }
-
-      //this._recordTrade(spread);
 
       console.log('BEST BID', bestBid, bestAsk);
     }
