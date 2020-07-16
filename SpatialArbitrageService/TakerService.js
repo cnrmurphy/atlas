@@ -7,7 +7,7 @@ const FTX_TAKER_FEE = .003;
 const CBP_TAKER_FEE = .0025;
 
 const Bid = (price, size, exchange) => ({ price, size, exchange });
-const Ask = (price, size, exchange) => ({ price, size, exchange })
+const Ask = (price, size, exchange) => ({ price, size, exchange });
 
 class SpatialArbitrageService {
   constructor(coinbaseClient, ftxClient, transferService, prisma) {
