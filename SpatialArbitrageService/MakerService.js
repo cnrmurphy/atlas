@@ -165,14 +165,14 @@ class MakerService {
     const ftxAsk = Ask(bestFtxAsk[0], bestFtxAsk[1], 'FTX');
     const cbpAsk = Ask(bestCbpAsk[0], bestCbpAsk[1], 'Coinbase');
     const cbpBid = Bid(bestCbpBid[0], bestCbpBid[1], 'Coinbase');
-    
+
     logMsg(`Looking for trade`);
 
     if (ftxAsk.price < cbpBid.price) {
       const tradeSize = Math.min(ftxAsk.size, cbpBid.size);
       const spread = Math.abs(ftxAsk.price - cbpBid.price);
-      const ftxPrice = (ftxAsk.price * tradeSize) * FTX_TAKER_FEE;
-      const cbpPrice = (cbpBid.price * tradeSize) * CBP_TAKER_FEE;
+      const ftxPrice = (ftxAsk.price * tradeSize) * FTX_MAKER_FEE;
+      const cbpPrice = (cbpBid.price * tradeSize) * CBP_MAKER_FEE;
       const cost = ftxPrice + cbpPrice;
       const profit = spread * tradeSize;
       logMsg(`Buy FTX, sell Coinbase - Coinbase: price: ${cbpBid.price * tradeSize} cost: ${cbpPrice} | FTX Price: price: ${ftxAsk.price * tradeSize} - cost ${ftxPrice} | Spread: ${spread} | size: ${tradeSize} | Profit: ${profit} | Cost: ${cost} | Return: ${profit - cost}`);
